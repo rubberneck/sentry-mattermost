@@ -7,7 +7,16 @@ This is based in the sentry-slack plugin: https://github.com/getsentry/sentry-sl
 # Usage
 Install with pip and enable the plugin in a Sentry Project:
 
-    pip install sentry_mattermost
+     pip2.7 install -e git+https://github.com/Biekos/sentry-mattermost.git@master#egg=sentry-mattermost
+
+You may need to install git:
+
+    apt install git
+
+If you are using the docker version of sentry you can enter the right container using: 
+
+    docker exec -it sentry_onpremise_web_1  bash 
+
 
 Configure Mattermost:
 - Create an Incoming Webhook
