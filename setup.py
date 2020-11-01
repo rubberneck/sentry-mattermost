@@ -24,12 +24,12 @@ from sentry_mattermost import VERSION
 setup(
     name="sentry_mattermost",
     version=VERSION,
-    author="Andre Freitas",
-    author_email="andre.freitas@ndrive.com",
+    author="Andre Freitas, Guillaume Lastecoueres, Biekos TEAM",
+    author_email="andre.freitas@ndrive.com, px9e@gmx.fr, team@biekos.com",
     description=("A Sentry plugin to send Mattermost notifications."),
     license="MIT",
     keywords="sentry mattermost devops",
-    url="https://github.com/NDrive/sentry-mattermost",
+    url="https://github.com/Biekos/sentry-mattermost",
     packages=['sentry_mattermost'],
     entry_points={
        'sentry.plugins': [

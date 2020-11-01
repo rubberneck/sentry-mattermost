@@ -30,12 +30,6 @@ from sentry.plugins.bases import notify
 import sentry_mattermost
 
 
-def get_project_full_name(project):
-    if project.team.name not in project.name:
-        return '%s %s' % (project.team.name, project.name)
-    return project.name
-
-
 def get_rules(notification, group, project):
     rules = []
     for rule in notification.rules:
@@ -64,11 +58,17 @@ class PayloadFactory:
         group = event.group
         project = group.project
 
+        if group.culprit:
+            culprit = group.culprit.encode("utf-8")
+        else:
+            culprit = None
+        project_name = project.get_full_name().encode("utf-8")
+
         params = {
             "title": group.message_short.encode('utf-8'),
             "link": group.get_absolute_url(),
-            "culprit": group.culprit.encode('utf-8'),
-            "project": get_project_full_name(project).encode('utf-8')
+            "culprit": culprit,
+            "project": project_name
         }
 
         if plugin.get_option('include_rules', project):
@@ -114,18 +114,24 @@ class Mattermost(notify.NotificationPlugin):
     slug = 'mattermost'
     description = 'Enables notifications for Mattermost Open Source Chat'
     version = sentry_mattermost.VERSION
-    author = 'Andre Freitas <andre.freitas@ndrive.com>'
-    author_url = 'https://github.com/NDrive/sentry-mattermost'
+    author = 'Andre Freitas <andre.freitas@ndrive.com>, Guillaume Lastecoueres<px9e@gmx.fr>'
+    author_url = 'https://github.com/Biekos/sentry-mattermost'
     project_conf_form = MattermostOptionsForm
 
     def is_configured(self, project):
         return all((self.get_option(k, project) for k in ('webhook',)))
 
-    def notify(self, notification):
-        project = notification.event.group.project
-        if not self.is_configured(project):
-            return
+    def notify(self, notification, raise_exception=True):
+        try:
+            project = notification.event.group.project
+            if not self.is_configured(project):
+                return
 
-        webhook = self.get_option('webhook', project)
-        payload = PayloadFactory.create(self, notification)
-        return request(webhook, payload)
+            webhook = self.get_option('webhook', project)
+            payload = PayloadFactory.create(self, notification)
+            return request(webhook, payload)
+        except Exception as e:
+            if raise_exception:
+                raise e
+            else:
+                pass
