@@ -18,23 +18,22 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import json
 import urllib2
-import operator
 
-from django import forms
-from django.db.models import Q
 from sentry import tagstore
 from sentry.plugins.bases import notify
+from sentry_plugins.base import CorePluginMixin
+from sentry.utils import json
+from sentry.integrations import FeatureDescription, IntegrationFeatures
 
 import sentry_mattermost
 
 
-def get_rules(notification, group, project):
-    rules = []
-    for rule in notification.rules:
-        rules.append(rule.label.encode('utf-8'))
-    return ', '.join('%s' % r for r in rules)
+def get_rules(rules, group, project):
+    rules_list = []
+    for rule in rules:
+        rules_list.append(rule.label.encode('utf-8'))
+    return ', '.join('%s' % r for r in rules_list)
 
 
 def get_tags(event):
@@ -42,7 +41,7 @@ def get_tags(event):
     if not tag_list:
         return ()
 
-    return ((tagstore.get_tag_key_label(k), tagstore.get_tag_value_label(k, v)) 
+    return ((tagstore.get_tag_key_label(k), tagstore.get_tag_value_label(k, v))
             for k, v in tag_list)
 
 
@@ -53,8 +52,7 @@ class PayloadFactory:
         return template.format(**params)
 
     @classmethod
-    def create(cls, plugin, notification):
-        event = notification.event
+    def create(cls, plugin, event, rules):
         group = event.group
         project = group.project
 
@@ -72,7 +70,7 @@ class PayloadFactory:
         }
 
         if plugin.get_option('include_rules', project):
-            params["rules"] = get_rules(notification, group, project)
+            params["rules"] = get_rules(rules, group, project)
 
         if plugin.get_option('include_tags', project):
             params["tags"] = get_tags(event)
@@ -81,7 +79,7 @@ class PayloadFactory:
 
         payload = {
             "username": "Sentry",
-            "icon_url": "https://myovchev.github.io/sentry-slack/images/logo32.png", #noqa
+            "icon_url": "https://myovchev.github.io/sentry-slack/images/logo32.png",  # noqa
             "text": text
         }
         return payload
@@ -94,44 +92,58 @@ def request(url, payload):
     return response.read()
 
 
-class MattermostOptionsForm(notify.NotificationConfigurationForm):
-    webhook = forms.URLField(
-        help_text='Incoming Webhook URL',
-        widget=forms.URLInput(attrs={'class': 'span8'})
-    )
-    include_rules = forms.BooleanField(
-        help_text='Include triggering rules with notifications',
-        required=False,
-    )
-    include_tags = forms.BooleanField(
-        help_text='Include tags with notifications',
-        required=False,
-    )
-
-
-class Mattermost(notify.NotificationPlugin):
+class Mattermost(CorePluginMixin, notify.NotificationPlugin):
     title = 'Mattermost'
     slug = 'mattermost'
     description = 'Enables notifications for Mattermost Open Source Chat'
     version = sentry_mattermost.VERSION
     author = 'Andre Freitas <andre.freitas@ndrive.com>, Guillaume Lastecoueres<px9e@gmx.fr>'
     author_url = 'https://github.com/Biekos/sentry-mattermost'
-    project_conf_form = MattermostOptionsForm
+    required_field = "webhook"
+    conf_key = "mattermost"
+
+    feature_descriptions = [
+        FeatureDescription(
+            """
+            Enables notifications for Mattermost Open Source Chat.  
+            """,
+            IntegrationFeatures.ALERT_RULE,
+        )
+    ]
+
+    def get_config(self, project, **kwargs):
+        return [
+            {
+                "name": "webhook",
+                "label": "Webhook URL",
+                "type": "url",
+                "placeholder": "e.g. https://mattermost.example.com/hooks/00000000000000000",
+                "required": True,
+                "help": "Your custom mattermost webhook URL.",
+            },
+            {
+                "name": "include_rules",
+                "label": "Include Rules",
+                "type": "bool",
+                "required": False,
+                "help": "Include rules with notifications.",
+            },
+            {
+                "name": "include_tags",
+                "label": "Include tags",
+                "type": "bool",
+                "required": False,
+                "help": "Include tags with notifications."
+            }]
 
     def is_configured(self, project):
-        return all((self.get_option(k, project) for k in ('webhook',)))
+        return bool(self.get_option("webhook", project))
 
-    def notify(self, notification, raise_exception=True):
-        try:
-            project = notification.event.group.project
-            if not self.is_configured(project):
-                return
+    def notify_users(self, group, event, triggering_rules, fail_silently=False, **kwargs):
+        project = event.group.project
+        if not self.is_configured(project):
+            return
 
-            webhook = self.get_option('webhook', project)
-            payload = PayloadFactory.create(self, notification)
-            return request(webhook, payload)
-        except Exception as e:
-            if raise_exception:
-                raise e
-            else:
-                pass
+        webhook = self.get_option('webhook', project)
+        payload = PayloadFactory.create(self, event, triggering_rules)
+        return request(webhook, payload)
