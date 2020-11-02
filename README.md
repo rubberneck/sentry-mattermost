@@ -13,9 +13,10 @@ You may need to install git:
 
     apt install git
 
-If you are using the docker version of sentry you can enter the right container using: 
+If you are using the docker version of sentry you need to enter into the right containers using: 
 
-    docker exec -it sentry_onpremise_web_1  bash 
+    docker exec -it sentry_onpremise_web_1 bash 
+    docker exec -it sentry_onpremise_worker_1 bash 
 
 
 Configure Mattermost:
