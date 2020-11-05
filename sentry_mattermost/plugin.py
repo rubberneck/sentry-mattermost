@@ -87,7 +87,8 @@ class PayloadFactory:
 
 def request(url, payload):
     data = "payload=" + json.dumps(payload)
-    req = urllib2.Request(url, data)
+    # Prevent servers from rejecting webhook calls by adding a existing user agent
+    req = urllib2.Request(url, data, headers={'User-Agent' : "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"})
     response = urllib2.urlopen(req)
     return response.read()
 
