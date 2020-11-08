@@ -23,6 +23,24 @@ Configure Mattermost:
 - Create an Incoming Webhook
 - Enable override usernames and profile picture icons in System Console Integrations
 
+# Templating
+
+You can change the template per project. It supports markdown. 
+
+To configure the variable you need to write `{myvariable}`
+
+Variable can design any attribute/function of the `group` class in https://github.com/getsentry/sentry/blob/master/src/sentry/models/group.py#L247
+
+By doing `{group@message}` for example. 
+
+Or any attribute/function of the `project` class in https://github.com/getsentry/sentry/blob/master/src/sentry/models/project.py#L78
+
+By doing `{project@status}` for example. 
+
+There are two specific variable `{rules}` and `{tags}` which when you want to include rules or tags will be replace by their content. 
+
+The default value is:
+`"__[{project@get_full_name}]({project@get_absolute_url})__\n__[{group@title}]({group@get_absolute_url})__\n{group@culprit}\n{rules}\n{tags}"`
 
 # Contributing
 We use Docker to setup a development stack. Make sure you have the latest
