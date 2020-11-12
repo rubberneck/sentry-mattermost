@@ -25,15 +25,13 @@ from sentry.plugins.bases import notify
 from sentry_plugins.base import CorePluginMixin
 from sentry.utils import json
 from sentry.integrations import FeatureDescription, IntegrationFeatures
+from string import Formatter
 
 import sentry_mattermost
 
 
 def get_rules(rules, group, project):
-    rules_list = []
-    for rule in rules:
-        rules_list.append(rule.label.encode('utf-8'))
-    return ', '.join('%s' % r for r in rules_list)
+    return ', '.join(rules)
 
 
 def get_tags(event):
@@ -46,36 +44,38 @@ def get_tags(event):
 
 
 class PayloadFactory:
-    @classmethod
-    def render_text(cls, params):
-        template = "__{project}__\n__[{title}]({link})__ \n{culprit}\n"
-        return template.format(**params)
 
     @classmethod
-    def create(cls, plugin, event, rules):
-        group = event.group
-        project = group.project
+    def create(cls, plugin, event, template, rules):
+        project = event.group.project
 
-        if group.culprit:
-            culprit = group.culprit.encode("utf-8")
-        else:
-            culprit = None
-        project_name = project.get_full_name().encode("utf-8")
+        names = [fn for _, fn, _, _ in Formatter().parse(template)
+                 if fn not in {None, "rules", "tags"}]
+        params = {"rules": "", "tags": ""}
+        for name in names:
+            getter = None
+            particules = name.split("@")
+            for particule in particules:
+                if not getter:
+                    getter = event.__getattribute__(particule)
+                else:
+                    getter = getter.__getattribute__(particule)
 
-        params = {
-            "title": group.message_short.encode('utf-8'),
-            "link": group.get_absolute_url(),
-            "culprit": culprit,
-            "project": project_name
-        }
+            if callable(getter):
+                params[name] = getter()
+            else:
+                params[name] = getter
 
         if plugin.get_option('include_rules', project):
-            params["rules"] = get_rules(rules, group, project)
+            params["rules"] = get_rules(rules, event.group, project)
 
         if plugin.get_option('include_tags', project):
             params["tags"] = get_tags(event)
 
-        text = cls.render_text(params)
+
+        # \n is not correctly interpreted from the text field of sentry
+        template = template.replace("\\n", "\n")
+        text = template.format(**params)
 
         payload = {
             "username": "Sentry",
@@ -123,6 +123,14 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
                 "help": "Your custom mattermost webhook URL.",
             },
             {
+                "name": "template",
+                "label": "Template",
+                "type": "string",
+                "required": True,
+                "default": "__[{project@get_full_name}]({project@get_absolute_url})__\n__[{group@title}]({group@get_absolute_url})__\n{group@culprit}\n{rules}\n{tags}",
+                "help": "You can define the template that the plugin will post to mattermost. More info: https://github.com/Biekos/sentry-mattermost",
+            },
+            {
                 "name": "include_rules",
                 "label": "Include Rules",
                 "type": "bool",
@@ -140,11 +148,13 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
     def is_configured(self, project):
         return bool(self.get_option("webhook", project))
 
-    def notify_users(self, group, event, triggering_rules, fail_silently=False, **kwargs):
+    def notify_users(self, group, event, triggering_rules, **kwargs):
         project = event.group.project
         if not self.is_configured(project):
             return
 
         webhook = self.get_option('webhook', project)
-        payload = PayloadFactory.create(self, event, triggering_rules)
+        template = self.get_option('template', project)
+        payload = PayloadFactory.create(
+            self, event, template, triggering_rules)
         return request(webhook, payload)
