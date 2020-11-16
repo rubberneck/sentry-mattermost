@@ -19,11 +19,10 @@
 # THE SOFTWARE.
 
 from setuptools import setup
-from sentry_mattermost import VERSION
 
 setup(
     name="sentry_mattermost",
-    version=VERSION,
+    version="0.0.5",
     author="Andre Freitas, Guillaume Lastecoueres, Biekos TEAM",
     author_email="andre.freitas@ndrive.com, px9e@gmx.fr, team@biekos.com",
     description=("A Sentry plugin to send Mattermost notifications."),
