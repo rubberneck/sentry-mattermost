@@ -19,6 +19,7 @@
 # THE SOFTWARE.
 
 import urllib2
+import logging
 
 from sentry import tagstore
 from sentry.plugins.bases import notify
@@ -27,7 +28,7 @@ from sentry.utils import json
 from sentry.integrations import FeatureDescription, IntegrationFeatures
 from string import Formatter
 
-import sentry_mattermost
+logger = logging.getLogger("sentry.integrations.sentry_mattermost.plugin")
 
 
 def get_rules(rules, group, project):
@@ -49,8 +50,14 @@ class PayloadFactory:
     def create(cls, plugin, event, template, rules):
         project = event.group.project
 
+        if not template:
+            # In some cases like after updating the plugin, template config variable can be
+            # None, in that case we need a fallback.
+            template = "__[{project@get_full_name}]({project@get_absolute_url})__\n__[{group@title}]({group@get_absolute_url})__\n{group@culprit}\n{rules}\n{tags}"
+
         names = [fn for _, fn, _, _ in Formatter().parse(template)
                  if fn not in {None, "rules", "tags"}]
+
         params = {"rules": "", "tags": ""}
         for name in names:
             getter = None
@@ -72,7 +79,6 @@ class PayloadFactory:
         if plugin.get_option('include_tags', project):
             params["tags"] = get_tags(event)
 
-
         # \n is not correctly interpreted from the text field of sentry
         template = template.replace("\\n", "\n")
         text = template.format(**params)
@@ -88,7 +94,8 @@ class PayloadFactory:
 def request(url, payload):
     data = "payload=" + json.dumps(payload)
     # Prevent servers from rejecting webhook calls by adding a existing user agent
-    req = urllib2.Request(url, data, headers={'User-Agent' : "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"})
+    req = urllib2.Request(url, data, headers={
+                          'User-Agent': "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"})
     response = urllib2.urlopen(req)
     return response.read()
 
@@ -97,7 +104,7 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
     title = 'Mattermost'
     slug = 'mattermost'
     description = 'Enables notifications for Mattermost Open Source Chat'
-    version = sentry_mattermost.VERSION
+    version = '0.0.5'
     author = 'Andre Freitas <andre.freitas@ndrive.com>, Guillaume Lastecoueres<px9e@gmx.fr>'
     author_url = 'https://github.com/Biekos/sentry-mattermost'
     required_field = "webhook"
@@ -143,18 +150,38 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
                 "type": "bool",
                 "required": False,
                 "help": "Include tags with notifications."
+            },
+            {
+                "name": "debug",
+                "label": "Debug mode",
+                "type": "bool",
+                "required": False,
+                "help": "Enable logging",
             }]
 
     def is_configured(self, project):
         return bool(self.get_option("webhook", project))
 
     def notify_users(self, group, event, triggering_rules, **kwargs):
+
         project = event.group.project
+        debug_mode = self.get_option('debug', project)
         if not self.is_configured(project):
             return
 
         webhook = self.get_option('webhook', project)
+        if debug_mode:
+            logger.info("DEBUG:webhook used: {}".format(webhook))
         template = self.get_option('template', project)
+        if debug_mode:
+            logger.info("DEBUG:template used: {}".format(template))
         payload = PayloadFactory.create(
             self, event, template, triggering_rules)
-        return request(webhook, payload)
+        if debug_mode:
+            logger.info("DEBUG:payload: {}".format(payload))
+
+        res = request(webhook, payload)
+
+        if debug_mode:
+            logger.info("DEBUG:request executed: {}".format(res))
+        return res
