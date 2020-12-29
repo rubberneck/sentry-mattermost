@@ -92,8 +92,8 @@ class PayloadFactory:
 
 
 def request(url, payload):
-    req = request.post(url, data=json.dumps(payload))
-    return request.status_code
+    req = requests.post(url, data=json.dumps(payload))
+    return req.status_code
 
 
 class Mattermost(CorePluginMixin, notify.NotificationPlugin):
