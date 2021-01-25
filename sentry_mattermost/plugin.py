@@ -92,6 +92,7 @@ class PayloadFactory:
 
 
 def request(url, payload):
+    # The User-Agent is present to prevent servers from rejecting webhook calls by adding a common user agent
     req = requests.post(url, data=json.dumps(payload), headers={'User-Agent': "Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0"})
     return req.status_code
 
