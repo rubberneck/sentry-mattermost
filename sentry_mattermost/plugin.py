@@ -18,8 +18,8 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import urllib2
 import logging
+import requests
 
 from sentry import tagstore
 from sentry.plugins.bases import notify
@@ -92,12 +92,9 @@ class PayloadFactory:
 
 
 def request(url, payload):
-    data = "payload=" + json.dumps(payload)
-    # Prevent servers from rejecting webhook calls by adding a existing user agent
-    req = urllib2.Request(url, data, headers={
-                          'User-Agent': "Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:57.0) Gecko/20100101 Firefox/57.0"})
-    response = urllib2.urlopen(req)
-    return response.read()
+    # The User-Agent is present to prevent servers from rejecting webhook calls by adding a common user agent
+    req = requests.post(url, data=json.dumps(payload), headers={'User-Agent': "Mozilla/5.0 (X11; Fedora; Linux x86_64; rv:84.0) Gecko/20100101 Firefox/84.0"})
+    return req.status_code
 
 
 class Mattermost(CorePluginMixin, notify.NotificationPlugin):
