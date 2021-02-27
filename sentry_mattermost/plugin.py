@@ -36,13 +36,12 @@ def get_rules(rules, group, project):
 
 
 def get_tags(event):
-    tag_list = event.get_tags()
+    tag_list = event.tags
     if not tag_list:
-        return ()
+        return ""
 
-    return ((tagstore.get_tag_key_label(k), tagstore.get_tag_value_label(k, v))
-            for k, v in tag_list)
-
+    return ", ".join([": ".join([tagstore.get_tag_key_label(k), tagstore.get_tag_value_label(k, v)])
+            for k, v in tag_list])
 
 class PayloadFactory:
 
@@ -160,7 +159,6 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
         return bool(self.get_option("webhook", project))
 
     def notify_users(self, group, event, triggering_rules, **kwargs):
-
         project = event.group.project
         debug_mode = self.get_option('debug', project)
         if not self.is_configured(project):
