@@ -87,6 +87,8 @@ class PayloadFactory:
             "icon_url": "https://myovchev.github.io/sentry-slack/images/logo32.png",  # noqa
             "text": text
         }
+        if plugin.get_option('channel', project):
+            payload["channel"] = plugin.get_option('channel', project)
         return payload
 
 
@@ -146,6 +148,13 @@ class Mattermost(CorePluginMixin, notify.NotificationPlugin):
                 "type": "bool",
                 "required": False,
                 "help": "Include tags with notifications."
+            },
+            {
+                "name": "channel",
+                "label": "Channel Name",
+                "type": "string",
+                "required": False,
+                "help": "Mattermost channel name, leave empty for default channel defined by webhook",
             },
             {
                 "name": "debug",
