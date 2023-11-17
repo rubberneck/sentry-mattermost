@@ -43,6 +43,9 @@ def get_tags(event):
     return ", ".join([": ".join([tagstore.get_tag_key_label(k), tagstore.get_tag_value_label(k, v)])
             for k, v in tag_list])
 
+def get_event(event):
+    return ', '.join(event)
+
 class PayloadFactory:
 
     @classmethod
@@ -55,9 +58,9 @@ class PayloadFactory:
             template = "__[{project@get_full_name}]({project@get_absolute_url})__\n__[{group@title}]({group@get_absolute_url})__\n{group@culprit}\n{rules}\n{tags}"
 
         names = [fn for _, fn, _, _ in Formatter().parse(template)
-                 if fn not in {None, "rules", "tags"}]
+                 if fn not in {None, "rules", "whole_event"}]
 
-        params = {"rules": "", "tags": ""}
+        params = {"rules": ""}
         for name in names:
             getter = None
             particules = name.split("@")
@@ -77,6 +80,8 @@ class PayloadFactory:
 
         if plugin.get_option('include_tags', project):
             params["tags"] = get_tags(event)
+
+            params["whole_event"] = get_event(event)
 
         # \n is not correctly interpreted from the text field of sentry
         template = template.replace("\\n", "\n")
