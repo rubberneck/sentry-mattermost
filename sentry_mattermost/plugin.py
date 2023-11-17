@@ -44,7 +44,7 @@ def get_tags(event):
             for k, v in tag_list])
 
 def get_event(event):
-    return ', '.join(event)
+    return json.dumps(event)
 
 class PayloadFactory:
 
